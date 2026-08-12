@@ -1184,6 +1184,7 @@ struct PiStreamState {
     message_saw_text: bool,
     message_saw_reasoning: bool,
     failed: bool,
+    failure_message: Option<String>,
     tools: HashMap<String, (ActivityKind, String)>,
 }
 
@@ -1242,10 +1243,12 @@ fn handle_pi_message(
             let _ = events.send(DriverEvent::TurnFinished {
                 success,
                 summary: (!success).then(|| {
-                    tr!(
-                        "errors.provider_complete_turn",
-                        provider = flavor.display_name()
-                    )
+                    state.failure_message.clone().unwrap_or_else(|| {
+                        tr!(
+                            "errors.provider_complete_turn",
+                            provider = flavor.display_name()
+                        )
+                    })
                 }),
             });
         }
@@ -1258,6 +1261,7 @@ fn handle_pi_message(
             if !state.run_started {
                 state.run_started = true;
                 state.failed = false;
+                state.failure_message = None;
                 let _ = events.send(DriverEvent::TurnStarted);
             }
         }
@@ -1292,13 +1296,23 @@ fn handle_pi_message(
                 }
                 Some("error") => {
                     state.failed = true;
-                    let _ = events.send(DriverEvent::Error(pi_error_message(flavor, update)));
+                    let message = pi_error_message(flavor, update);
+                    state.failure_message = Some(message.clone());
+                    let _ = events.send(DriverEvent::Error(message));
                 }
                 _ => {}
             }
         }
         "message_end" => {
             if value.pointer("/message/role").and_then(Value::as_str) == Some("assistant") {
+                if let Some(message) = value.get("message")
+                    && message.get("stopReason").and_then(Value::as_str) == Some("error")
+                {
+                    state.failed = true;
+                    let error = pi_error_message(flavor, message);
+                    state.failure_message = Some(error.clone());
+                    let _ = events.send(DriverEvent::Error(error));
+                }
                 // This is the context the next call starts from, not the
                 // cumulative billed total for the whole session.
                 if let Some(tokens) = value.get("message").and_then(pi_message_context_tokens) {
@@ -1363,6 +1377,7 @@ fn handle_pi_message(
         "auto_retry_end" => {
             if value.get("success").and_then(Value::as_bool) == Some(true) {
                 state.failed = false;
+                state.failure_message = None;
             } else {
                 state.failed = true;
                 let message = value
@@ -1372,6 +1387,7 @@ fn handle_pi_message(
                     .unwrap_or_else(|| {
                         format!("{} exhausted its automatic retries", flavor.display_name())
                     });
+                state.failure_message = Some(message.clone());
                 let _ = events.send(DriverEvent::Error(message));
             }
         }
@@ -2019,6 +2035,45 @@ mod tests {
         assert!(matches!(
             event_rx.recv().unwrap(),
             DriverEvent::TextDelta(value) if value == "answer"
+        ));
+    }
+
+    #[test]
+    fn message_end_error_fails_the_turn_with_the_provider_message() {
+        let (pending, commands, _command_rx, mut state) = harness();
+        let (events, event_rx) = unbounded();
+        for value in [
+            json!({"type": "agent_start"}),
+            json!({
+                "type": "message_end",
+                "message": {
+                    "role": "assistant",
+                    "content": [],
+                    "stopReason": "error",
+                    "errorMessage": "OpenAI API error (403): service unavailable"
+                }
+            }),
+            json!({"type": "agent_settled"}),
+        ] {
+            handle_pi_message(
+                PiFlavor::Pi,
+                value,
+                &pending,
+                &commands,
+                &events,
+                &mut state,
+            );
+        }
+
+        assert!(matches!(event_rx.recv().unwrap(), DriverEvent::TurnStarted));
+        assert!(matches!(
+            event_rx.recv().unwrap(),
+            DriverEvent::Error(message) if message.contains("403")
+        ));
+        assert!(matches!(
+            event_rx.recv().unwrap(),
+            DriverEvent::TurnFinished { success: false, summary: Some(message) }
+                if message.contains("403")
         ));
     }
 
