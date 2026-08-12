@@ -1865,6 +1865,42 @@ fn model_picker_highlight_wraps_at_both_ends() {
 }
 
 #[test]
+fn claude_picker_accepts_and_remembers_custom_model_ids() {
+    use super::ModelPickerTab;
+    use super::composer::visible_picker_models;
+    use crate::model::{FavoriteModel, ProviderModel, ProviderProbe};
+
+    let probes = [ProviderProbe {
+        provider: ProviderKind::Claude,
+        installed: true,
+        path: Some("/bin/claude".into()),
+        models: vec![ProviderModel::new("claude-sonnet-5", "Claude Sonnet 5")],
+        agent_presets: Vec::new(),
+    }];
+    let tab = ModelPickerTab::Provider(ProviderKind::Claude);
+
+    let typed = visible_picker_models(&probes, &[], &[], None, tab, "proxy/sonnet-latest");
+    assert_eq!(typed.len(), 1);
+    assert_eq!(typed[0].1.id, "proxy/sonnet-latest");
+    assert!(!typed[0].1.reasoning_efforts.is_empty());
+
+    let favorites = [FavoriteModel {
+        provider: ProviderKind::Claude,
+        model: "proxy/sonnet-latest".into(),
+    }];
+    let remembered = visible_picker_models(
+        &probes,
+        &favorites,
+        &[],
+        None,
+        ModelPickerTab::Favorites,
+        "",
+    );
+    assert_eq!(remembered.len(), 1);
+    assert_eq!(remembered[0].1.id, "proxy/sonnet-latest");
+}
+
+#[test]
 fn settings_search_filters_pages_for_arrow_cycling() {
     use super::SettingsPage;
 

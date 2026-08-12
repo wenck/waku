@@ -1201,7 +1201,7 @@ fn grok_reasoning_model(model: ProviderModel) -> ProviderModel {
     }
 }
 
-fn claude_reasoning_model(id: &str, name: &str) -> ProviderModel {
+pub fn claude_reasoning_model(id: &str, name: &str) -> ProviderModel {
     ProviderModel::new(id, name).reasoning(
         reasoning_options(["low", "medium", "high", "xhigh", "max"]),
         "high",
