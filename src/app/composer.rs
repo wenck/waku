@@ -822,8 +822,7 @@ impl Waku {
         }
 
         let search_query = self.model_search.read(cx).content().to_owned();
-        let normalized_query = search_query.trim().to_ascii_lowercase();
-        let searching = !normalized_query.is_empty();
+        let searching = !search_query.trim().is_empty();
         let selected_tab = self.model_picker_tab;
         let selected_model = selected_model.map(str::to_owned);
         let probes = self.probes.clone();
@@ -920,7 +919,7 @@ impl Waku {
                 &disabled_providers,
                 locked_provider,
                 selected_tab,
-                &normalized_query,
+                &search_query,
             )
         } else {
             Vec::new()
@@ -3872,9 +3871,18 @@ pub(super) fn visible_picker_models(
     disabled_providers: &[ProviderKind],
     locked_provider: Option<ProviderKind>,
     selected_tab: ModelPickerTab,
-    normalized_query: &str,
+    query: &str,
 ) -> Vec<(ProviderKind, ProviderModel)> {
+    let query = query.trim();
+    let normalized_query = query.to_ascii_lowercase();
     let searching = !normalized_query.is_empty();
+    let usable_provider = |kind| {
+        probes
+            .iter()
+            .any(|probe| probe.provider == kind && probe.installed)
+            && (locked_provider.is_none() || locked_provider == Some(kind))
+            && (!disabled_providers.contains(&kind) || locked_provider == Some(kind))
+    };
     let mut models = probes
         .iter()
         .filter(|probe| probe.installed)
@@ -3911,6 +3919,55 @@ pub(super) fn visible_picker_models(
             }
         })
         .collect::<Vec<_>>();
+
+    // Claude Code accepts aliases and arbitrary full model IDs through
+    // `--model`, but exposes no model-inventory command. Preserve favorited
+    // custom IDs in the catalog and let an exact search become a selectable
+    // row, which also covers Anthropic-compatible third-party providers.
+    let known_claude_ids = probes
+        .iter()
+        .find(|probe| probe.provider == ProviderKind::Claude)
+        .map(|probe| {
+            probe
+                .models
+                .iter()
+                .map(|model| model.id.as_str())
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+    if usable_provider(ProviderKind::Claude) {
+        for favorite in favorites.iter().filter(|favorite| {
+            favorite.provider == ProviderKind::Claude
+                && !known_claude_ids.contains(favorite.model.as_str())
+        }) {
+            let model =
+                crate::model_catalog::claude_reasoning_model(&favorite.model, &favorite.model);
+            let matches = if searching {
+                favorite
+                    .model
+                    .to_ascii_lowercase()
+                    .contains(&normalized_query)
+            } else {
+                selected_tab == ModelPickerTab::Favorites
+                    || selected_tab == ModelPickerTab::Provider(ProviderKind::Claude)
+            };
+            if matches {
+                models.push((ProviderKind::Claude, model));
+            }
+        }
+
+        let claude_tab = selected_tab == ModelPickerTab::Provider(ProviderKind::Claude);
+        let valid_custom_id = searching && !query.chars().any(char::is_whitespace);
+        let already_listed = models
+            .iter()
+            .any(|(kind, model)| *kind == ProviderKind::Claude && model.id == query);
+        if claude_tab && valid_custom_id && !already_listed {
+            models.push((
+                ProviderKind::Claude,
+                crate::model_catalog::claude_reasoning_model(query, query),
+            ));
+        }
+    }
     if !searching && selected_tab == ModelPickerTab::Favorites {
         models.sort_by_key(|(kind, model)| {
             favorites
