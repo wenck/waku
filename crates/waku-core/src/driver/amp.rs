@@ -65,6 +65,7 @@ pub(super) fn amp_args(
     }
     args.extend([
         "--execute".to_owned(),
+        "--no-archive-after-execute".to_owned(),
         // Implies --stream-json, which --stream-json-input requires.
         "--stream-json-thinking".to_owned(),
         "--stream-json-input".to_owned(),
@@ -701,12 +702,14 @@ mod tests {
         assert!(args.contains(&"--stream-json-thinking".to_owned()));
         assert!(args.contains(&"--stream-json-input".to_owned()));
         assert!(args.contains(&"--execute".to_owned()));
+        assert!(args.contains(&"--no-archive-after-execute".to_owned()));
         assert!(args.contains(&"--fast".to_owned()));
         // The prompt is never an argument; it goes in on stdin.
         assert!(!args.iter().any(|arg| arg.contains("Reply with")));
 
         let fresh = amp_args(None, None, None, None);
         assert!(!fresh.contains(&"threads".to_owned()));
+        assert!(fresh.contains(&"--no-archive-after-execute".to_owned()));
         assert!(!fresh.contains(&"--fast".to_owned()));
     }
 
