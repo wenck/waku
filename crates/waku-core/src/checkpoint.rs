@@ -40,6 +40,14 @@ pub fn turn_diff_base_ref(session_id: Uuid, turn_count: usize) -> String {
 /// checkpoint: a branch switch or terminal edit between turns must not be
 /// attributed to either response.
 pub fn capture_turn_start(cwd: &Path, session_id: Uuid, turn_count: usize) -> anyhow::Result<()> {
+    // Checkpoints disabled locally: skip the pre-turn Git snapshot entirely so
+    // sending a message never waits on `git add -A` / `write-tree`. The
+    // downstream restore path handles a missing turn-start ref by degrading
+    // gracefully (see `session.pre_turn_checkpoint_missing`).
+    let _ = (cwd, session_id, turn_count);
+    return Ok(());
+
+    #[allow(unreachable_code)]
     if !is_git_repository(cwd) {
         return Ok(());
     }
@@ -80,6 +88,20 @@ pub fn capture_turn_start(cwd: &Path, session_id: Uuid, turn_count: usize) -> an
 
 pub fn capture_turn(cwd: &Path, session_id: Uuid, turn_count: usize) -> anyhow::Result<Checkpoint> {
     let git_ref = checkpoint_ref(session_id, turn_count);
+    // Checkpoints disabled locally: return the same `Unavailable` shape the
+    // non-Git-repo branch already returns, so downstream UI treats every turn
+    // as "no checkpoint" without any Git work.
+    return Ok(Checkpoint {
+        turn_count,
+        git_ref,
+        status: CheckpointStatus::Unavailable,
+        files: Vec::new(),
+        additions: 0,
+        deletions: 0,
+        created_at: unix_time(),
+    });
+
+    #[allow(unreachable_code)]
     if !is_git_repository(cwd) {
         return Ok(Checkpoint {
             turn_count,
