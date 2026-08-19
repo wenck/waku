@@ -180,19 +180,11 @@ fn prepare_submission(
     };
     let project_path = workspace.path().unwrap_or(&project.path);
 
-    // Every turn gets its own immutable starting snapshot. Reusing the prior
-    // response's ending ref would attribute branch switches or terminal edits
-    // made between turns to the next response.
-    let checkpoint_warning = workspace_ack(
-        &workspace_client,
-        waku_client::WorkspaceOperation::CaptureTurnStart {
-            cwd: project_path.to_path_buf(),
-            session_id,
-            turn_count,
-        },
-    )
-    .err()
-    .map(|error| tr!("errors.capture_pre_turn_checkpoint", error = error));
+    // Checkpoints disabled locally: skip the pre-turn daemon RPC entirely so
+    // the provider receives the prompt without waiting on a round-trip. The
+    // downstream restore path already handles a missing turn-start ref.
+    let _ = (project_path, turn_count, &workspace_client);
+    let checkpoint_warning: Option<String> = None;
 
     // Process startup can synchronously resolve executables, bind sockets,
     // and spawn children. It belongs behind the same animated preparation
@@ -1633,36 +1625,11 @@ impl Waku {
     /// [`Self::start_pending_checkpoint_captures`], which every caller that
     /// holds a `Context` runs straight after queueing.
     pub(super) fn capture_latest_turn_checkpoint_for(&mut self, session_id: Uuid) {
-        let Some((session, turn_count)) = self
-            .state
-            .sessions
-            .iter()
-            .find(|session| session.id == session_id)
-            .and_then(|session| {
-                session
-                    .turns
-                    .last()
-                    .filter(|turn| turn.status != TurnStatus::Running)
-                    .map(|turn| (session, turn.turn_count))
-            })
-        else {
-            return;
-        };
-        if self.checkpoint_capture_pending(session_id, turn_count) {
-            return;
-        }
-        let Some(project_path) = self
-            .workspace_path_for_session(session)
-            .map(std::path::Path::to_path_buf)
-        else {
-            return;
-        };
-        self.pending_checkpoint_captures
-            .push(PendingCheckpointCapture {
-                session_id,
-                turn_count,
-                project_path,
-            });
+        // Checkpoints disabled locally: never queue a post-turn capture. This
+        // keeps `ending_checkpoint_pending` false so the next queued message
+        // drains immediately instead of waiting on a daemon round-trip that
+        // would return an `Unavailable` checkpoint anyway.
+        let _ = session_id;
     }
 
     /// Runs queued turn checkpoints on the background executor.
