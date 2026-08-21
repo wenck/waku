@@ -1511,6 +1511,35 @@ impl Waku {
         cx.notify();
     }
 
+    pub(super) fn increase_ui_font_size_action(
+        &mut self,
+        _: &IncreaseUiFontSize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let next = neighbor_font_size(self.state.ui_font_size, Direction::Up);
+        self.set_ui_font_size(next, window, cx);
+    }
+
+    pub(super) fn decrease_ui_font_size_action(
+        &mut self,
+        _: &DecreaseUiFontSize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let next = neighbor_font_size(self.state.ui_font_size, Direction::Down);
+        self.set_ui_font_size(next, window, cx);
+    }
+
+    pub(super) fn reset_ui_font_size_action(
+        &mut self,
+        _: &ResetUiFontSize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.set_ui_font_size(waku_client::persistence::DEFAULT_UI_FONT_SIZE, window, cx);
+    }
+
     fn set_code_font_size(&mut self, size: f32, cx: &mut Context<Self>) {
         let size = waku_client::persistence::sanitized_code_font_size(size);
         if self.state.code_font_size == size {
@@ -2430,6 +2459,31 @@ impl Waku {
 const FONT_SIZES: [f32; 12] = [
     11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0,
 ];
+
+#[derive(Clone, Copy)]
+enum Direction {
+    Up,
+    Down,
+}
+
+/// Step to the next `FONT_SIZES` entry above or below `current`. Values
+/// between rungs snap to the nearest matching direction, and the endpoints
+/// clamp so repeated key presses hold at the extreme instead of wrapping.
+fn neighbor_font_size(current: f32, direction: Direction) -> f32 {
+    match direction {
+        Direction::Up => FONT_SIZES
+            .iter()
+            .copied()
+            .find(|size| *size > current)
+            .unwrap_or_else(|| *FONT_SIZES.last().expect("FONT_SIZES is non-empty")),
+        Direction::Down => FONT_SIZES
+            .iter()
+            .copied()
+            .rev()
+            .find(|size| *size < current)
+            .unwrap_or(FONT_SIZES[0]),
+    }
+}
 
 fn font_size_label(size: f32) -> String {
     if size.fract() == 0.0 {
