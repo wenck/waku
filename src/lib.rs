@@ -106,7 +106,10 @@ actions!(
         WebviewCopy,
         WebviewCut,
         WebviewPaste,
-        WebviewSelectAll
+        WebviewSelectAll,
+        IncreaseUiFontSize,
+        DecreaseUiFontSize,
+        ResetUiFontSize
     ]
 );
 
@@ -308,6 +311,13 @@ pub fn run() {
                 KeyBinding::new("secondary-v", WebviewPaste, Some("Browser")),
                 KeyBinding::new("secondary-a", WebviewSelectAll, Some("Browser")),
                 KeyBinding::new("escape", BrowserAddressCancel, Some("BrowserAddress")),
+                // UI font size zoom. Matches the browser convention: the
+                // logical binding is Cmd/Ctrl and `+`, but macOS reports the
+                // unshifted `=` on that key, so both spellings map here.
+                KeyBinding::new("secondary-=", IncreaseUiFontSize, None),
+                KeyBinding::new("secondary-shift-=", IncreaseUiFontSize, None),
+                KeyBinding::new("secondary--", DecreaseUiFontSize, None),
+                KeyBinding::new("secondary-0", ResetUiFontSize, None),
             ]);
 
             cx.on_action(|_: &Quit, cx| cx.quit());
