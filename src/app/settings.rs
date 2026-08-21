@@ -2427,7 +2427,9 @@ impl Waku {
 /// Sizes offered by the font-size dropdowns. A hand-edited `app.json` may
 /// hold values outside this list; they render as-is and simply select
 /// nothing here.
-const FONT_SIZES: [f32; 8] = [11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0];
+const FONT_SIZES: [f32; 12] = [
+    11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0,
+];
 
 fn font_size_label(size: f32) -> String {
     if size.fract() == 0.0 {

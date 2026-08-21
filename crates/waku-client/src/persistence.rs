@@ -280,7 +280,7 @@ pub const DEFAULT_CODE_FONT_SIZE: f32 = 13.0;
 /// Bounds a possibly hand-edited font size to something the layout survives.
 fn sanitized_font_size(size: f32, fallback: f32) -> f32 {
     if size.is_finite() {
-        size.clamp(9.0, 24.0)
+        size.clamp(9.0, 28.0)
     } else {
         fallback
     }
