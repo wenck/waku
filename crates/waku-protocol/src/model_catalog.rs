@@ -256,7 +256,7 @@ pub fn cursor_suffix_service_tier(suffix: &str, tiers: &[ProviderModelOption]) -
         .then(|| "fast".to_owned())
 }
 
-fn claude_reasoning_model(id: &str, name: &str) -> ProviderModel {
+pub fn claude_reasoning_model(id: &str, name: &str) -> ProviderModel {
     ProviderModel::new(id, name).reasoning(
         reasoning_options(["low", "medium", "high", "xhigh", "max"]),
         "high",
