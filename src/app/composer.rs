@@ -3941,7 +3941,7 @@ pub(super) fn visible_picker_models(
                 && !known_claude_ids.contains(favorite.model.as_str())
         }) {
             let model =
-                crate::model_catalog::claude_reasoning_model(&favorite.model, &favorite.model);
+                waku_protocol::model_catalog::claude_reasoning_model(&favorite.model, &favorite.model);
             let matches = if searching {
                 favorite
                     .model
@@ -3964,7 +3964,7 @@ pub(super) fn visible_picker_models(
         if claude_tab && valid_custom_id && !already_listed {
             models.push((
                 ProviderKind::Claude,
-                crate::model_catalog::claude_reasoning_model(query, query),
+                waku_protocol::model_catalog::claude_reasoning_model(query, query),
             ));
         }
     }
