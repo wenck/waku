@@ -73,6 +73,15 @@ gpui = { git = "https://github.com/egoist/zed", branch = "waku-webview", feature
 libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# GPUI's build script compiles `src/shaders.metal` with `xcrun -sdk macosx metal`,
+# which only ships with a full Xcode install — Command Line Tools alone does not
+# provide the `metal` utility. This machine has no Xcode, so declare the shader
+# crate directly with `runtime_shaders`: the build then only stitches the shader
+# header and source into one file and GPUI compiles it at runtime instead. The
+# cost is a one-off shader compile at startup, paid to keep local builds working.
+gpui_macos = { git = "https://github.com/egoist/zed", branch = "waku-webview", features = [
+  "runtime_shaders",
+] }
 wry = { version = "0.56", features = ["devtools"] }
 block2 = "0.6"
 # Matches the version GPUI itself renders with, so RenderImage frames are the
