@@ -8600,6 +8600,7 @@ dependencies = [
  "futures",
  "futures-lite",
  "gpui",
+ "gpui_macos",
  "gpui_platform",
  "image",
  "libc",
