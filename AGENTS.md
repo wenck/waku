@@ -13,6 +13,11 @@
   manually when it is confirmed unavailable.
 - No visual test unless requested.
 
+## CLI tooling preferences
+
+- When searching text, patterns, or file content in shell commands, always prefer `rg` (ripgrep) over `grep`.
+- When locating files or directories in shell commands, always prefer `fd` over `find`.
+
 ## Performance
 
 - Treat performance as a product requirement, not a follow-up. Waku is a native
