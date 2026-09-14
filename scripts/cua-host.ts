@@ -70,34 +70,22 @@ export async function prepareCuaHost(): Promise<string> {
     await writeFile(abi, extended);
   const target = join(cache, "target");
   console.error("Building Cua SDK native cursor host...");
-  // Apple ld-27037.1 + SDK 27 mis-links large proc-macro dylibs when
-  // minOS >= 13 ("mis-aligned LINKEDIT string pool"). Overriding the
-  // subproject's MACOSX_DEPLOYMENT_TARGET=13.0 to 11.0 keeps Apple ld
-  // (same linker that already builds Waku's own serde_derive cleanly).
-  // rust-lld 22.1.6 produces the same broken LINKEDIT for this tree.
-  const cuaCargoConfig = join(source, "libs/cua-driver/rust/.cargo/config.toml");
-  const existing = await readFile(cuaCargoConfig, "utf8");
-  const patched = existing
-    .replaceAll('MACOSX_DEPLOYMENT_TARGET = "13.0"', 'MACOSX_DEPLOYMENT_TARGET = "11.0"')
-    .replaceAll('MACOSX_DEPLOYMENT_TARGET = "14.0"', 'MACOSX_DEPLOYMENT_TARGET = "11.0"')
-    .replaceAll('MACOSX_DEPLOYMENT_TARGET = "12.0"', 'MACOSX_DEPLOYMENT_TARGET = "11.0"');
-  if (patched !== existing) await writeFile(cuaCargoConfig, patched);
-  await $`cargo build --locked --release --manifest-path ${join(source, "libs/cua-driver/rust/Cargo.toml")} --target-dir ${target} --package cua-driver-sdk`
-    .cwd(join(source, "libs/cua-driver/rust"));
-  // Build was forced to minOS 11 to dodge the Apple ld bug; stamp the
-  // shipped dylib back up to the app floor (13.0) so the Mach-O matches
-  // Waku's Info.plist. Runtime is identical on macOS 13+.
-  const builtDylib = join(target, "release", library);
-  const stampedDylib = join(target, "release", `stamped-${library}`);
-  await $`vtool -set-build-version macos 13.0 27.0 -replace -output ${stampedDylib} ${builtDylib}`;
-  await rename(stampedDylib, builtDylib);
-  if (existsSync(join(destination, library))) {
-    const destDylib = join(destination, library);
-    const destStamped = join(destination, `stamped-${library}`);
-    await $`vtool -set-build-version macos 13.0 27.0 -replace -output ${destStamped} ${destDylib}`;
-    await rename(destStamped, destDylib);
-    return destination;
+  // Keep the subproject's MACOSX_DEPLOYMENT_TARGET=13.0. Apple ld-27037.1
+  // mis-links large proc-macro dylibs at minOS>=13 unless dyld chained
+  // fixups are disabled ("mis-aligned LINKEDIT string pool").
+  // -no_fixup_chains fixes that while leaving minos 13.0 intact.
+  const savedRustflags = process.env.RUSTFLAGS;
+  const nfc = "-C link-arg=-Wl,-no_fixup_chains";
+  process.env.RUSTFLAGS = savedRustflags
+    ? `${savedRustflags} ${nfc}`
+    : nfc;
+  try {
+    await $`cargo build --locked --release --manifest-path ${join(source, "libs/cua-driver/rust/Cargo.toml")} --target-dir ${target} --package cua-driver-sdk`
+      .cwd(join(source, "libs/cua-driver/rust"));
+  } finally {
+    process.env.RUSTFLAGS = savedRustflags;
   }
+  if (existsSync(join(destination, library))) return destination;
   const staging = await mkdtemp(join(cache, ".host-"));
   try {
     await cp(join(target, "release", library), join(staging, library));
