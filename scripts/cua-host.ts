@@ -84,7 +84,20 @@ export async function prepareCuaHost(): Promise<string> {
   if (patched !== existing) await writeFile(cuaCargoConfig, patched);
   await $`cargo build --locked --release --manifest-path ${join(source, "libs/cua-driver/rust/Cargo.toml")} --target-dir ${target} --package cua-driver-sdk`
     .cwd(join(source, "libs/cua-driver/rust"));
-  if (existsSync(join(destination, library))) return destination;
+  // Build was forced to minOS 11 to dodge the Apple ld bug; stamp the
+  // shipped dylib back up to the app floor (13.0) so the Mach-O matches
+  // Waku's Info.plist. Runtime is identical on macOS 13+.
+  const builtDylib = join(target, "release", library);
+  const stampedDylib = join(target, "release", `stamped-${library}`);
+  await $`vtool -set-build-version macos 13.0 27.0 -replace -output ${stampedDylib} ${builtDylib}`;
+  await rename(stampedDylib, builtDylib);
+  if (existsSync(join(destination, library))) {
+    const destDylib = join(destination, library);
+    const destStamped = join(destination, `stamped-${library}`);
+    await $`vtool -set-build-version macos 13.0 27.0 -replace -output ${destStamped} ${destDylib}`;
+    await rename(destStamped, destDylib);
+    return destination;
+  }
   const staging = await mkdtemp(join(cache, ".host-"));
   try {
     await cp(join(target, "release", library), join(staging, library));
