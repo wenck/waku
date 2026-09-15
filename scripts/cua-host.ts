@@ -75,15 +75,23 @@ export async function prepareCuaHost(): Promise<string> {
   // fixups are disabled ("mis-aligned LINKEDIT string pool").
   // -no_fixup_chains fixes that while leaving minos 13.0 intact.
   const savedRustflags = process.env.RUSTFLAGS;
-  const nfc = "-C link-arg=-Wl,-no_fixup_chains";
-  process.env.RUSTFLAGS = savedRustflags
-    ? `${savedRustflags} ${nfc}`
-    : nfc;
+  const nfc =
+    process.platform === "darwin" ? "-C link-arg=-Wl,-no_fixup_chains" : "";
+  const combined = [savedRustflags, nfc].filter(Boolean).join(" ");
+  if (combined) {
+    process.env.RUSTFLAGS = combined;
+  } else {
+    delete process.env.RUSTFLAGS;
+  }
   try {
     await $`cargo build --locked --release --manifest-path ${join(source, "libs/cua-driver/rust/Cargo.toml")} --target-dir ${target} --package cua-driver-sdk`
       .cwd(join(source, "libs/cua-driver/rust"));
   } finally {
-    process.env.RUSTFLAGS = savedRustflags;
+    if (savedRustflags !== undefined) {
+      process.env.RUSTFLAGS = savedRustflags;
+    } else {
+      delete process.env.RUSTFLAGS;
+    }
   }
   if (existsSync(join(destination, library))) return destination;
   const staging = await mkdtemp(join(cache, ".host-"));
