@@ -165,6 +165,7 @@ settings.theme_dark: 深色
 input.do_anything: 做什么都可以…
 input.search_models: 搜索模型…
 input.search_branches: 搜索分支
+input.search_projects: 搜索项目
 input.new_branch_name: 新分支名称
 input.detected_automatically: 自动检测
 input.filter_projects: 筛选项目
@@ -260,6 +261,7 @@ sidebar.status_failed: 失败
 project.new_project: 新建项目…
 project.no_project: 不使用项目
 project.no_project_name: 无项目
+project.none_found: 未找到项目
 project.choose_project: 选择项目
 project.default_folder: 默认文件夹
 project.project_lower: 项目

@@ -170,6 +170,7 @@ settings.theme_dark: ダーク
 input.do_anything: 何でも依頼できます…
 input.search_models: モデルを検索…
 input.search_branches: ブランチを検索
+input.search_projects: プロジェクトを検索
 input.new_branch_name: 新しいブランチ名
 input.detected_automatically: 自動検出
 input.filter_projects: プロジェクトを絞り込む
@@ -273,6 +274,7 @@ sidebar.status_failed: 失敗
 project.new_project: 新規プロジェクト…
 project.no_project: プロジェクトを使用しない
 project.no_project_name: プロジェクトなし
+project.none_found: プロジェクトが見つかりません
 project.choose_project: プロジェクトを選択
 project.default_folder: デフォルトフォルダ
 project.project_lower: プロジェクト
