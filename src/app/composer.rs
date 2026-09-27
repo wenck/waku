@@ -3360,7 +3360,6 @@ impl Waku {
 
     pub(super) fn render_workspace_footer(&mut self, cx: &mut Context<Self>) -> Div {
         let theme = Theme::current(cx);
-        let selected_project_id = self.state.selected_project;
         let projectless_selected = self.selected_project().is_some_and(Project::is_projectless);
         let project_name = self
             .selected_project()
@@ -3376,7 +3375,7 @@ impl Waku {
             .selected_session()
             .is_some_and(|session| !session.has_started() && !session.is_busy());
 
-        let project_handle = self.menu_handle("workspace-project", cx);
+        let project_handle = self.project_picker_handle(ProjectPickerSite::Composer, cx);
         let project_trigger = MenuChip::new("workspace-project")
             .icon("icons/folder.svg", theme.text_tertiary)
             .label(project_name)
@@ -3385,67 +3384,11 @@ impl Waku {
             .selected(can_configure_workspace && project_handle.is_open())
             .max_w(px(190.0));
         let project_selector = if can_configure_workspace {
-            let project_options = self
-                .state
-                .projects
-                .iter()
-                .filter(|project| !project.is_projectless())
-                .filter(|project| Some(project.id) == selected_project_id)
-                .chain(
-                    self.state
-                        .projects
-                        .iter()
-                        .filter(|project| !project.is_projectless())
-                        .filter(|project| Some(project.id) != selected_project_id),
-                )
-                .map(|project| (project.id, project.display_name()))
-                .collect::<Vec<_>>();
-            let weak = cx.entity().downgrade();
-            dropdown_menu(
+            self.render_project_picker(
                 project_trigger,
-                "workspace-project-menu",
                 &project_handle,
-                MenuAlign::AboveLeft,
-                move |_| {
-                    let mut items = project_options
-                        .clone()
-                        .into_iter()
-                        .map(|(project_id, project_name)| {
-                            let weak = weak.clone();
-                            MenuItem::new(project_name, move |_, cx| {
-                                if Some(project_id) != selected_project_id {
-                                    let _ = weak.update(cx, |this, cx| {
-                                        this.select_project_from_composer(project_id, cx);
-                                    });
-                                }
-                            })
-                            .selected(Some(project_id) == selected_project_id)
-                        })
-                        .collect::<Vec<_>>();
-                    if !items.is_empty() {
-                        items.push(MenuItem::Separator);
-                    }
-                    let add_project = weak.clone();
-                    items.push(
-                        MenuItem::new(tr!("project.new_project"), move |_, cx| {
-                            let _ = add_project.update(cx, |this, cx| this.add_project(cx));
-                        })
-                        .icon("icons/folder-new.svg"),
-                    );
-                    let projectless = weak.clone();
-                    items.push(
-                        MenuItem::new(tr!("project.no_project"), move |_, cx| {
-                            let _ = projectless.update(cx, |this, cx| {
-                                if !this.selected_project().is_some_and(Project::is_projectless) {
-                                    this.create_projectless_session_from_composer(cx);
-                                }
-                            });
-                        })
-                        .icon("icons/x.svg")
-                        .selected(projectless_selected),
-                    );
-                    items
-                },
+                ProjectPickerSite::Composer,
+                cx,
             )
         } else {
             project_trigger.into_any_element()

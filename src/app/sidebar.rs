@@ -2292,7 +2292,6 @@ impl Waku {
                         ),
                 );
         }
-        let selected_project_id = self.state.selected_project;
         let projectless_selected = self.selected_project().is_some_and(Project::is_projectless);
         let project_name = self
             .selected_project()
@@ -2304,68 +2303,13 @@ impl Waku {
                 }
             })
             .unwrap_or_else(|| tr!("project.your_project"));
-        let project_options = self
-            .state
-            .projects
-            .iter()
-            .filter(|project| !project.is_projectless())
-            .filter(|project| Some(project.id) == selected_project_id)
-            .chain(
-                self.state
-                    .projects
-                    .iter()
-                    .filter(|project| !project.is_projectless())
-                    .filter(|project| Some(project.id) != selected_project_id),
-            )
-            .map(|project| (project.id, project.display_name()))
-            .collect::<Vec<_>>();
-        let weak = cx.entity().downgrade();
-        let handle = self.menu_handle("empty-state-project", cx);
-        let project_selector = dropdown_menu(
+        let handle = self.project_picker_handle(ProjectPickerSite::EmptyState, cx);
+        let project_selector = self.render_project_picker(
             ProjectNameSelector::new("empty-state-project", project_name)
                 .selected(handle.is_open()),
-            "empty-state-project-menu",
             &handle,
-            MenuAlign::BelowLeft,
-            move |_| {
-                let mut items = project_options
-                    .clone()
-                    .into_iter()
-                    .map(|(project_id, project_name)| {
-                        let weak = weak.clone();
-                        MenuItem::new(project_name, move |_, cx| {
-                            if Some(project_id) == selected_project_id {
-                                return;
-                            }
-                            let _ = weak.update(cx, |this, cx| this.select_project(project_id, cx));
-                        })
-                        .selected(Some(project_id) == selected_project_id)
-                    })
-                    .collect::<Vec<_>>();
-                if !items.is_empty() {
-                    items.push(MenuItem::Separator);
-                }
-                let add_project_weak = weak.clone();
-                items.push(
-                    MenuItem::new(tr!("project.new_project"), move |_, cx| {
-                        let _ = add_project_weak.update(cx, |this, cx| this.add_project(cx));
-                    })
-                    .icon("icons/folder-new.svg"),
-                );
-                let projectless_weak = weak.clone();
-                items.push(
-                    MenuItem::new(tr!("project.no_project"), move |_, cx| {
-                        let _ = projectless_weak.update(cx, |this, cx| {
-                            if !this.selected_project().is_some_and(Project::is_projectless) {
-                                this.create_projectless_session(cx);
-                            }
-                        });
-                    })
-                    .icon("icons/x.svg")
-                    .selected(projectless_selected),
-                );
-                items
-            },
+            ProjectPickerSite::EmptyState,
+            cx,
         );
         div()
             .flex_1()
