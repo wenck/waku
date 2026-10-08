@@ -16,6 +16,17 @@ the original feature bullet instead of adding separate entries for them.
 
 ## [unreleased]
 
+## [0.1.20]
+
+- Support the OpenCode 2.0 release, which now installs as `opencode`: OpenCode runs on its shared background service, OpenCode 2 beta and OpenCode 1 tasks continue as OpenCode tasks, and OpenCode's free models work in Waku tasks
+- Fix rewinding or branching an OpenCode task after steering it mid-turn, which forked OpenCode's conversation at the wrong turn
+- Fix OpenCode tasks going silent when the OpenCode service restarts; a turn it interrupted now continues in place once the service is back
+- Fix Cursor model discovery and options so the pickers list every model the Cursor CLI advertises, with its reasoning effort, fast mode, and context window
+- Show the release version in Claude model names, such as Opus 4.6 (1M context), in the model picker and composer
+- Make the project picker searchable and scrollable, keeping long project lists reachable with the new-project and no-project actions pinned below
+- Fix Pi sessions failing to start with "Could not initialize Pi" when Pi is slow to load extensions
+- Keep long user messages compact: they scroll inside their bubble with edge fades instead of taking over the transcript
+
 ## [0.1.19]
 
 - Render inline and block LaTeX math in Markdown, with a Copy Expression action and a setting to show the source
