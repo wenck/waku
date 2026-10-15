@@ -79,7 +79,7 @@ use crate::{
 const TRAFFIC_LIGHT_CLEARANCE: f32 = 86.0;
 #[cfg(not(target_os = "macos"))]
 const TRAFFIC_LIGHT_CLEARANCE: f32 = 8.0;
-const CONTENT_MAX_WIDTH: f32 = 720.0;
+const CONTENT_MAX_WIDTH: f32 = 1080.0;
 /// Menu-registry id of the composer's model picker, shared by its render site
 /// and the primary-modifier `/` toggle action.
 const MODEL_PICKER_MENU_ID: &str = "provider-model-picker";

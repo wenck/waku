@@ -409,6 +409,8 @@ pub struct PersistedState {
     pub disabled_providers: Vec<ProviderKind>,
     #[serde(default)]
     pub provider_binary_overrides: HashMap<ProviderKind, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<String>,
     #[serde(skip)]
     daemon_settings_extra: BTreeMap<String, serde_json::Value>,
     #[serde(skip)]
@@ -467,6 +469,7 @@ impl PersistedState {
             computer_use_allowed_apps: Vec::new(),
             disabled_providers: Vec::new(),
             provider_binary_overrides: HashMap::new(),
+            proxy: None,
             daemon_settings_extra: BTreeMap::new(),
             dirty_sessions: HashSet::new(),
         }
@@ -556,6 +559,7 @@ impl PersistedState {
             computer_use_allowed_apps: self.computer_use_allowed_apps.clone(),
             disabled_providers: self.disabled_providers.clone(),
             provider_binary_overrides: self.provider_binary_overrides.clone(),
+            proxy: self.proxy.clone(),
             extra: self.daemon_settings_extra.clone(),
         }
     }
@@ -569,6 +573,7 @@ impl PersistedState {
         self.computer_use_allowed_apps = settings.computer_use_allowed_apps;
         self.disabled_providers = settings.disabled_providers;
         self.provider_binary_overrides = settings.provider_binary_overrides;
+        self.proxy = settings.proxy;
         self.daemon_settings_extra = settings.extra;
     }
 

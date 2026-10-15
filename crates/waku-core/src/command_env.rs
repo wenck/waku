@@ -47,7 +47,117 @@ pub fn command(program: impl AsRef<OsStr>) -> Command {
     if let Some(search_path) = search_path {
         command.env("PATH", search_path);
     }
+    apply_proxy_environment(&mut command);
     command
+}
+
+static PROXY_CACHE: RwLock<Option<Option<String>>> = RwLock::new(None);
+
+fn is_local_port_listening(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok()
+}
+
+/// Resolve the configured or detected proxy URL for child provider commands.
+pub fn resolve_proxy() -> Option<String> {
+    if let Ok(guard) = PROXY_CACHE.read() {
+        if let Some(cached) = &*guard {
+            return cached.clone();
+        }
+    }
+    let proxy = probe_proxy();
+    if let Ok(mut guard) = PROXY_CACHE.write() {
+        *guard = Some(proxy.clone());
+    }
+    proxy
+}
+
+fn probe_proxy() -> Option<String> {
+    if std::env::var("WAKU_NO_PROXY").is_ok() {
+        return None;
+    }
+
+    // 1. Explicit WAKU_PROXY environment variable
+    if let Ok(proxy) = std::env::var("WAKU_PROXY") {
+        let trimmed = proxy.trim();
+        if trimmed.eq_ignore_ascii_case("direct")
+            || trimmed.eq_ignore_ascii_case("none")
+            || trimmed.eq_ignore_ascii_case("off")
+        {
+            return None;
+        }
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_owned());
+        }
+    }
+
+    // 2. Check settings.json via waku_protocol::DaemonSettings::default_path()
+    let settings_path = waku_protocol::DaemonSettings::default_path();
+    if let Ok(contents) = fs::read_to_string(settings_path) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&contents) {
+            if let Some(proxy) = value.get("proxy").and_then(|p| p.as_str()) {
+                let trimmed = proxy.trim();
+                if trimmed.eq_ignore_ascii_case("direct")
+                    || trimmed.eq_ignore_ascii_case("none")
+                    || trimmed.eq_ignore_ascii_case("off")
+                {
+                    return None;
+                }
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_owned());
+                }
+            }
+        }
+    }
+
+    // 3. Inherited or cached shell proxy environment variables
+    for name in [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ] {
+        if let Some(val) = cached_login_shell_variable(OsStr::new(name)) {
+            let s = val.to_string_lossy().trim().to_owned();
+            if !s.is_empty() {
+                return Some(s);
+            }
+        }
+        if let Ok(val) = std::env::var(name) {
+            let s = val.trim().to_owned();
+            if !s.is_empty() {
+                return Some(s);
+            }
+        }
+    }
+
+    // 4. Default fallback: detect active local proxy on port 2080
+    if is_local_port_listening(2080) {
+        return Some("http://127.0.0.1:2080".to_owned());
+    }
+
+    None
+}
+
+/// Apply proxy environment variables to a child command.
+pub fn apply_proxy_environment(command: &mut Command) {
+    if let Some(proxy) = resolve_proxy() {
+        apply_proxy_to_command(command, &proxy);
+    }
+}
+
+pub fn apply_proxy_to_command(command: &mut Command, proxy: &str) {
+    command.env("HTTP_PROXY", proxy);
+    command.env("http_proxy", proxy);
+    command.env("HTTPS_PROXY", proxy);
+    command.env("https_proxy", proxy);
+    command.env("ALL_PROXY", proxy);
+    command.env("all_proxy", proxy);
+    const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
+    command.env("NO_PROXY", NO_PROXY);
+    command.env("no_proxy", NO_PROXY);
 }
 
 /// The `PATH` a provider CLI runs with: every directory Waku itself searched,
@@ -901,6 +1011,29 @@ mod tests {
         let directories = command_search_path(&command("git"));
 
         assert_eq!(directories, executable_search_paths());
+    }
+
+    #[test]
+    fn command_applies_proxy_environment() {
+        let mut cmd = Command::new("git");
+        apply_proxy_to_command(&mut cmd, "http://127.0.0.1:9999");
+        let envs: std::collections::HashMap<_, _> = cmd
+            .get_envs()
+            .filter_map(|(k, v)| v.map(|v| (k.to_os_string(), v.to_os_string())))
+            .collect();
+        assert_eq!(
+            envs.get(OsStr::new("HTTP_PROXY")),
+            Some(&OsString::from("http://127.0.0.1:9999"))
+        );
+        assert_eq!(
+            envs.get(OsStr::new("HTTPS_PROXY")),
+            Some(&OsString::from("http://127.0.0.1:9999"))
+        );
+        assert_eq!(
+            envs.get(OsStr::new("ALL_PROXY")),
+            Some(&OsString::from("http://127.0.0.1:9999"))
+        );
+        assert!(envs.contains_key(OsStr::new("NO_PROXY")));
     }
 
     #[cfg(unix)]
