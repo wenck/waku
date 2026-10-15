@@ -13,6 +13,34 @@
   manually when it is confirmed unavailable.
 - No visual test unless requested.
 
+## Build and packaging discipline (STRICT)
+
+- **NEVER run `scripts/release.ts` or package a DMG automatically.** Full release packaging takes 1.5–2 minutes due to hdiutil disk image creation, AppleScript Finder formatting (sleep 5s), and compression.
+- For code verification and fast feedback during development, **ONLY run `PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo check --all-targets`** (which finishes in 2–3 seconds).
+- Only package a release DMG when the user explicitly requests it (e.g. "打包", "构建DMG", "package").
+- When packaging is requested, use all CPU cores: `CARGO_BUILD_JOBS=$(sysctl -n hw.ncpu)` (e.g. 10 cores).
+  - Package command: `PATH="/opt/homebrew/opt/rustup/bin:$PATH" CARGO_BUILD_JOBS=10 WAKU_ANALYTICS_ENDPOINT="https://localhost/disabled" WAKU_ANALYTICS_WEBSITE_ID="disabled" WAKU_NO_HISTORY=1 bun run ./scripts/release.ts --skip-notarize --adhoc`
+  - If unmounting temporary DMG fails due to enterprise agents (e.g. `tbAgent` / Threatbook dissented), run `diskutil unmount force <mount_path>`.
+
+## Custom fork features (must be preserved across rebases and edits)
+
+1. **Disabled Git checkpoints**: `crates/waku-core/src/checkpoint.rs` capture calls return immediately to eliminate send stalls.
+2. **Allow custom Claude model IDs**: `crates/waku-core/src/model_catalog.rs` and `crates/waku-protocol/src/model_catalog.rs`: `claude_reasoning_model` marked `pub`.
+3. **Keep Amp threads unarchived**: `crates/waku-core/src/driver/amp.rs` preserves thread status.
+4. **Surface Pi message-end failures**: `crates/waku-core/src/driver/pi.rs`.
+5. **28px max font size & Cmd/Ctrl +/- zoom**: Font size clamps to 28px; Cmd/Ctrl + and - zoom UI.
+6. **Broader transcript line width**: `CONTENT_MAX_WIDTH = 1080.0`, `USER_MESSAGE_MAX_WIDTH = 920.0` in `src/app.rs` and `src/app/components.rs` to avoid premature text wrapping.
+7. **Proxy support & PI_PROXY injection**:
+   - Configurable in Settings (`General ➔ Network proxy`), auto-detects `http://127.0.0.1:2080`.
+   - Injects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `GRPC_PROXY`, and critically **`PI_PROXY`** (required by Oh My Pi / Bun fetch; otherwise Bun ignores HTTP_PROXY), `ANTHROPIC_PROXY`, `OPENAI_PROXY`.
+   - Process attribution: The Waku GUI process does not make AI requests directly; child daemon/agent CLI processes (`omp`, `18.11.0`, `agy`) connect to proxy port 2080.
+   - Oh My Pi model probe (`crates/waku-core/src/model_catalog.rs`) must NOT pass `--no-extensions`, so plugin-based providers (like Antigravity) are discovered.
+8. **Screen capture protection (anti-surveillance)**:
+   - `configure_capture_protection` in `src/platform.rs` and `src/lib.rs` sets `NSWindowSharingType::None` (`[window setSharingType:NSWindowSharingNone]`).
+   - Window contents appear completely blank/transparent in screenshots and screen recordings to shield against enterprise monitoring software. Can be bypassed via `WAKU_ALLOW_SCREEN_CAPTURE=1`.
+9. **Runtime shaders**: `gpui_macos` uses `runtime_shaders` in `Cargo.toml` to build on Macs without full Xcode.
+10. **cua-host minOS 13 linking**: `-C link-arg=-Wl,-no_fixup_chains` in `scripts/cua-host.ts`.
+
 ## CLI tooling preferences
 
 - When searching text, patterns, or file content in shell commands, always prefer `rg` (ripgrep) over `grep`.
