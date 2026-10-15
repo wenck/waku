@@ -374,6 +374,7 @@ pub fn run() {
                     },
                     move |window, cx| {
                         crate::platform::configure_main_window_close_behavior(window, cx);
+                        crate::platform::configure_capture_protection(window);
                         let waku = Waku::new(window, cx, daemon);
                         let composer_focus = waku.read(cx).composer_focus(cx);
                         window.focus(&composer_focus, cx);
@@ -402,6 +403,7 @@ pub fn run() {
 
             window
                 .update(cx, |_, window, cx| {
+                    crate::platform::configure_capture_protection(window);
                     crate::platform::configure_sidebar_material(
                         window,
                         crate::theme::Theme::current(cx).is_dark,
