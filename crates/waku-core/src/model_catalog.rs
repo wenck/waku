@@ -1024,14 +1024,14 @@ impl PiDialect {
                 "--no-context-files",
             ],
             // Oh My Pi rejects unknown flags outright, and spells context
-            // files `--no-rules`.
+            // files `--no-rules`. Extensions stay enabled so custom model
+            // provider extensions (such as Antigravity) are discovered.
             Self::OhMyPi => &[
                 "--mode",
                 "rpc",
                 "--no-session",
                 "--no-skills",
                 "--no-rules",
-                "--no-extensions",
             ],
         }
     }
@@ -2337,6 +2337,12 @@ done
         assert_eq!(models[0].id, "extension-provider/extension-model");
         assert_eq!(models[0].name, "Extension Model");
         assert!(models[0].is_default);
+
+        let omp_models = discover_pi_models(&binary, PiDialect::OhMyPi);
+        assert_eq!(omp_models.len(), 1);
+        assert_eq!(omp_models[0].id, "extension-provider/extension-model");
+        assert_eq!(omp_models[0].name, "Extension Model");
+
         let _ = std::fs::remove_file(binary);
     }
 

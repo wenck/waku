@@ -369,7 +369,7 @@ register model providers. Ids are `provider/model` slugs and are validated as
 such before launch.
 
 Oh My Pi rejects unknown flags outright, so its probe is its own list —
-`--no-session --no-skills --no-rules --no-extensions` — and the two describe
+`--no-session --no-skills --no-rules` — and the two describe
 thinking differently. Pi maps levels through a per-model `thinkingLevelMap`; Oh
 My Pi advertises the levels a model actually honors under `thinking.efforts`.
 `off` never appears in that list because it bypasses provider mapping entirely,
