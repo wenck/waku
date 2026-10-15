@@ -5,6 +5,7 @@ use std::path::Path;
 
 const USER_MESSAGE_MAX_HEIGHT: f32 = 400.0;
 const USER_MESSAGE_VIEWPORT_MAX_HEIGHT: f32 = USER_MESSAGE_MAX_HEIGHT - 16.0;
+const USER_MESSAGE_MAX_WIDTH: f32 = 920.0;
 
 pub(super) fn pulse_dot(size: f32, color: Hsla) -> AnyElement {
     motion::pulse(Duration::from_millis(1600), move |phase| {
@@ -387,7 +388,7 @@ fn render_sent_message_attachments(
         return None;
     }
     let mut row = div()
-        .max_w(px(540.0))
+        .max_w(px(USER_MESSAGE_MAX_WIDTH))
         .flex()
         .flex_wrap()
         .justify_end()
@@ -604,7 +605,7 @@ pub(super) fn render_message(params: MessageRender, cx: &mut App) -> AnyElement 
                 column = column.child(
                     div()
                         .w_full()
-                        .max_w(px(540.0))
+                        .max_w(px(USER_MESSAGE_MAX_WIDTH))
                         .rounded(px(12.0))
                         .bg(theme.raised)
                         .pt(px(9.0))
@@ -687,7 +688,7 @@ pub(super) fn render_message(params: MessageRender, cx: &mut App) -> AnyElement 
                             .id(SharedString::from(format!(
                                 "user-message-bubble-{message_id}"
                             )))
-                            .max_w(px(540.0))
+                            .max_w(px(USER_MESSAGE_MAX_WIDTH))
                             .max_h(px(USER_MESSAGE_MAX_HEIGHT))
                             .min_w_0()
                             .relative()

@@ -16,6 +16,8 @@ pub struct DaemonSettings {
     pub disabled_providers: Vec<ProviderKind>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub provider_binary_overrides: HashMap<ProviderKind, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -27,6 +29,7 @@ impl Default for DaemonSettings {
             computer_use_allowed_apps: Vec::new(),
             disabled_providers: Vec::new(),
             provider_binary_overrides: HashMap::new(),
+            proxy: None,
             extra: BTreeMap::new(),
         }
     }
