@@ -173,6 +173,12 @@ pub fn apply_proxy_to_command(command: &mut Command, proxy: &str) {
     command.env("all_proxy", &normalized);
     command.env("GRPC_PROXY", &normalized);
     command.env("grpc_proxy", &normalized);
+    command.env("PI_PROXY", &normalized);
+    command.env("pi_proxy", &normalized);
+    command.env("ANTHROPIC_PROXY", &normalized);
+    command.env("anthropic_proxy", &normalized);
+    command.env("OPENAI_PROXY", &normalized);
+    command.env("openai_proxy", &normalized);
     const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
     command.env("NO_PROXY", NO_PROXY);
     command.env("no_proxy", NO_PROXY);
@@ -1483,6 +1489,9 @@ mod tests {
         assert!(stdout.contains("HTTP_PROXY="));
         assert!(stdout.contains("HTTPS_PROXY="));
         assert!(stdout.contains("ALL_PROXY="));
+        assert!(stdout.contains("PI_PROXY="));
+        assert!(stdout.contains("ANTHROPIC_PROXY="));
+        assert!(stdout.contains("OPENAI_PROXY="));
         assert!(stdout.contains("NO_PROXY="));
     }
 
