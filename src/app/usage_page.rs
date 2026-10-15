@@ -52,6 +52,14 @@ impl Waku {
         if page == SettingsPage::Skills {
             self.ensure_skills_catalog(false, cx);
         }
+        if page == SettingsPage::General {
+            let proxy = self.state.proxy.clone().unwrap_or_default();
+            self.proxy_input.update(cx, |input, cx| {
+                if input.content() != proxy {
+                    input.set_content(proxy, cx);
+                }
+            });
+        }
         cx.notify();
     }
 

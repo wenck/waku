@@ -322,6 +322,12 @@ settings.render_math:
   en: Render math expressions
 settings.render_math_description:
   en: Show formatted math in Markdown. Turn off to show LaTeX source.
+settings.proxy:
+  en: Network proxy
+settings.proxy_description:
+  en: "Route AI provider requests through an HTTP or SOCKS5 proxy (e.g. http://127.0.0.1:2080). Leave empty to auto-detect."
+settings.proxy_placeholder:
+  en: "e.g. http://127.0.0.1:2080 (auto-detect)"
 settings.theme_system:
   en: System
 settings.theme_light:

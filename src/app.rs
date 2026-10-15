@@ -1074,6 +1074,7 @@ pub struct Waku {
     settings_search: Entity<TextInput>,
     daemon_port_input: Entity<TextInput>,
     daemon_origins_input: Entity<TextInput>,
+    proxy_input: Entity<TextInput>,
     daemon_reconfigure_pending: bool,
     daemon_token_revealed: bool,
     settings_focus: FocusHandle,
@@ -2038,6 +2039,14 @@ impl Waku {
             input.set_content(daemon_origins, cx);
             input
         });
+        let proxy_content = state.proxy.clone().unwrap_or_default();
+        let proxy_input = cx.new(|cx| {
+            let mut input = TextInput::new(window, cx)
+                .select_all_on_focus_click()
+                .placeholder(tr!("settings.proxy_placeholder"));
+            input.set_content(proxy_content, cx);
+            input
+        });
         let skills_search = cx.new(|cx| {
             TextInput::new(window, cx)
                 .clear_on_escape()
@@ -2600,6 +2609,26 @@ impl Waku {
                 )
                 .detach();
             }
+            cx.subscribe(
+                &proxy_input,
+                |this: &mut Self, entity, event: &InputEvent, cx| match event {
+                    InputEvent::Submit(_) | InputEvent::Edited => {
+                        let content = entity.read(cx).content().trim().to_string();
+                        let proxy = if content.is_empty() {
+                            None
+                        } else {
+                            Some(content)
+                        };
+                        if this.state.proxy != proxy {
+                            this.state.proxy = proxy;
+                            this.save();
+                            cx.notify();
+                        }
+                    }
+                    _ => {}
+                },
+            )
+            .detach();
             cx.subscribe(&skills_search, |_: &mut Self, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Edited) {
                     cx.notify();
@@ -2771,6 +2800,7 @@ impl Waku {
                 settings_search,
                 daemon_port_input,
                 daemon_origins_input,
+                proxy_input,
                 daemon_reconfigure_pending: false,
                 daemon_token_revealed: false,
                 settings_focus,
