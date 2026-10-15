@@ -141,6 +141,21 @@ fn probe_proxy() -> Option<String> {
     None
 }
 
+pub fn invalidate_proxy_cache() {
+    if let Ok(mut guard) = PROXY_CACHE.write() {
+        *guard = None;
+    }
+}
+
+fn normalize_proxy(proxy: &str) -> String {
+    let trimmed = proxy.trim();
+    if trimmed.contains("://") {
+        trimmed.to_string()
+    } else {
+        format!("http://{trimmed}")
+    }
+}
+
 /// Apply proxy environment variables to a child command.
 pub fn apply_proxy_environment(command: &mut Command) {
     if let Some(proxy) = resolve_proxy() {
@@ -149,12 +164,15 @@ pub fn apply_proxy_environment(command: &mut Command) {
 }
 
 pub fn apply_proxy_to_command(command: &mut Command, proxy: &str) {
-    command.env("HTTP_PROXY", proxy);
-    command.env("http_proxy", proxy);
-    command.env("HTTPS_PROXY", proxy);
-    command.env("https_proxy", proxy);
-    command.env("ALL_PROXY", proxy);
-    command.env("all_proxy", proxy);
+    let normalized = normalize_proxy(proxy);
+    command.env("HTTP_PROXY", &normalized);
+    command.env("http_proxy", &normalized);
+    command.env("HTTPS_PROXY", &normalized);
+    command.env("https_proxy", &normalized);
+    command.env("ALL_PROXY", &normalized);
+    command.env("all_proxy", &normalized);
+    command.env("GRPC_PROXY", &normalized);
+    command.env("grpc_proxy", &normalized);
     const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
     command.env("NO_PROXY", NO_PROXY);
     command.env("no_proxy", NO_PROXY);
@@ -222,6 +240,7 @@ fn detach_console(command: &mut Command) {
 /// as the child has been created.
 pub fn spawn(command: &mut Command) -> io::Result<Child> {
     detach_console(command);
+    apply_proxy_environment(command);
     with_sigchld_unblocked(|| command.spawn())
 }
 
@@ -1454,5 +1473,38 @@ mod tests {
         );
         let _ = fs::remove_file(shell);
         let _ = fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn commands_receive_proxy_environment_variables() {
+        let mut cmd = command("/usr/bin/env");
+        let output = output(&mut cmd).expect("run env");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("HTTP_PROXY="));
+        assert!(stdout.contains("HTTPS_PROXY="));
+        assert!(stdout.contains("ALL_PROXY="));
+        assert!(stdout.contains("NO_PROXY="));
+    }
+
+    #[test]
+    fn proxy_routes_outbound_curl_requests() {
+        use std::io::Read;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind mock proxy");
+        let proxy_port = listener.local_addr().expect("local addr").port();
+
+        let mut cmd = plain_command("curl");
+        apply_proxy_to_command(&mut cmd, &format!("127.0.0.1:{proxy_port}"));
+        cmd.args(["-s", "-m", "1", "http://example.com/test-endpoint"]);
+
+        let child = std::thread::spawn(move || {
+            let _ = cmd.output();
+        });
+
+        let (mut stream, _) = listener.accept().expect("accept proxy connection");
+        let mut buf = [0u8; 1024];
+        let n = stream.read(&mut buf).expect("read from curl");
+        let request = String::from_utf8_lossy(&buf[..n]);
+        assert!(request.contains("example.com") || request.contains("test-endpoint"));
+        child.join().expect("curl finished");
     }
 }
