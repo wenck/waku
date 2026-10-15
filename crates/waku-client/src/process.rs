@@ -165,6 +165,49 @@ impl DaemonProcess {
         for origin in &settings.allowed_origins {
             command.arg("--allow-origin").arg(origin);
         }
+        let settings_path = waku_protocol::DaemonSettings::default_path();
+        let proxy = if let Ok(contents) = std::fs::read_to_string(settings_path) {
+            serde_json::from_str::<serde_json::Value>(&contents)
+                .ok()
+                .and_then(|v| v.get("proxy").and_then(|p| p.as_str()).map(str::to_string))
+        } else {
+            None
+        };
+        let proxy = proxy
+            .or_else(|| std::env::var("WAKU_PROXY").ok())
+            .or_else(|| std::env::var("HTTPS_PROXY").ok())
+            .or_else(|| std::env::var("https_proxy").ok())
+            .or_else(|| {
+                let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 2080));
+                if std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok() {
+                    Some("http://127.0.0.1:2080".to_string())
+                } else {
+                    None
+                }
+            });
+        if let Some(proxy) = proxy.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+            if !proxy.eq_ignore_ascii_case("direct")
+                && !proxy.eq_ignore_ascii_case("none")
+                && !proxy.eq_ignore_ascii_case("off")
+            {
+                let normalized = if proxy.contains("://") {
+                    proxy.to_string()
+                } else {
+                    format!("http://{proxy}")
+                };
+                command.env("HTTP_PROXY", &normalized);
+                command.env("http_proxy", &normalized);
+                command.env("HTTPS_PROXY", &normalized);
+                command.env("https_proxy", &normalized);
+                command.env("ALL_PROXY", &normalized);
+                command.env("all_proxy", &normalized);
+                command.env("GRPC_PROXY", &normalized);
+                command.env("grpc_proxy", &normalized);
+                const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
+                command.env("NO_PROXY", NO_PROXY);
+                command.env("no_proxy", NO_PROXY);
+            }
+        }
         let mut child = command
             .env(DAEMON_TOKEN_ENV, &token)
             .env(APP_EXECUTABLE_ENV, app_executable)

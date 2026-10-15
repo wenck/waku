@@ -78,6 +78,7 @@ impl DaemonSettingsStore {
         let mut current = self.settings.lock();
         write_atomic(&self.path, &settings)?;
         *current = settings;
+        crate::command_env::invalidate_proxy_cache();
         Ok(())
     }
 }
