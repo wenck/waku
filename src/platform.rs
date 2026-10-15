@@ -405,6 +405,38 @@ pub fn configure_main_window_close_behavior(window: &Window, cx: &gpui::App) {
 #[cfg(not(target_os = "macos"))]
 pub fn configure_main_window_close_behavior(_: &Window, _: &gpui::App) {}
 
+/// Protect the window from screenshots and screen recording by enterprise
+/// surveillance tools or screen capture APIs.
+#[cfg(target_os = "macos")]
+pub fn configure_capture_protection(window: &Window) {
+    if std::env::var("WAKU_ALLOW_SCREEN_CAPTURE").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true")) {
+        return;
+    }
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSView, NSWindowSharingType};
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+        return;
+    };
+    let RawWindowHandle::AppKit(handle) = handle.as_raw() else {
+        return;
+    };
+    let Some(_main_thread) = MainThreadMarker::new() else {
+        return;
+    };
+
+    unsafe {
+        let view = handle.ns_view.cast::<NSView>().as_ref();
+        if let Some(native_window) = view.window() {
+            native_window.setSharingType(NSWindowSharingType::None);
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn configure_capture_protection(_: &Window) {}
+
 #[cfg(target_os = "macos")]
 pub fn hide_window(window: &mut Window) {
     use objc2::MainThreadMarker;
