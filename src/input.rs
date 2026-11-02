@@ -2182,15 +2182,37 @@ impl EntityInputHandler for TextInput {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
-        let layout = self.last_layout.as_ref()?;
-        let range = self.range_from_utf16(&range_utf16);
-        let start = layout.position_for_index(range.start)?;
-        let end = layout.position_for_index(range.end)?;
+        let Some(layout) = self.last_layout.as_ref() else {
+            return Some(Bounds::new(
+                bounds.origin,
+                size(px(8.0), bounds.size.height.max(px(16.0))),
+            ));
+        };
+        let layout_len = layout.len();
+        // A range arriving while text is marked is relative to the marked
+        // text, matching replace_and_mark_text_in_range and macOS IMK convention.
+        let range = if let Some(marked) = self.marked_range.as_ref() {
+            let absolute = self.range_from_relative_utf16(marked.start, &range_utf16);
+            absolute.start.clamp(marked.start, marked.end)
+                ..absolute.end.clamp(marked.start, marked.end)
+        } else {
+            self.range_from_utf16(&range_utf16)
+        };
+        let start_offset = range.start.min(layout_len);
+        let end_offset = range.end.min(layout_len);
+        let start = layout.position_for_index(start_offset).unwrap_or(bounds.origin);
+        let end = layout.position_for_index(end_offset).unwrap_or(start);
         let line_height = layout.line_height();
+        let fallback_width = (line_height * 0.5).max(px(2.0));
         if start.y == end.y {
-            Some(Bounds::from_corners(
+            let width = if end.x > start.x {
+                end.x - start.x
+            } else {
+                fallback_width
+            };
+            Some(Bounds::new(
                 start,
-                point(end.x, end.y + line_height),
+                size(width, line_height),
             ))
         } else {
             Some(Bounds::from_corners(
