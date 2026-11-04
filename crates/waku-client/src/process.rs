@@ -173,46 +173,55 @@ impl DaemonProcess {
         } else {
             None
         };
-        let proxy = proxy
-            .or_else(|| std::env::var("WAKU_PROXY").ok())
-            .or_else(|| std::env::var("HTTPS_PROXY").ok())
-            .or_else(|| std::env::var("https_proxy").ok())
-            .or_else(|| {
-                let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 2080));
-                if std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok() {
-                    Some("http://127.0.0.1:2080".to_string())
-                } else {
-                    None
-                }
-            });
-        if let Some(proxy) = proxy.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
-            if !proxy.eq_ignore_ascii_case("direct")
-                && !proxy.eq_ignore_ascii_case("none")
-                && !proxy.eq_ignore_ascii_case("off")
-            {
-                let normalized = if proxy.contains("://") {
-                    proxy.to_string()
-                } else {
-                    format!("http://{proxy}")
-                };
-                command.env("HTTP_PROXY", &normalized);
-                command.env("http_proxy", &normalized);
-                command.env("HTTPS_PROXY", &normalized);
-                command.env("https_proxy", &normalized);
-                command.env("ALL_PROXY", &normalized);
-                command.env("all_proxy", &normalized);
-                command.env("GRPC_PROXY", &normalized);
-                command.env("grpc_proxy", &normalized);
-                command.env("PI_PROXY", &normalized);
-                command.env("pi_proxy", &normalized);
-                command.env("ANTHROPIC_PROXY", &normalized);
-                command.env("anthropic_proxy", &normalized);
-                command.env("OPENAI_PROXY", &normalized);
-                command.env("openai_proxy", &normalized);
-                const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
-                command.env("NO_PROXY", NO_PROXY);
-                command.env("no_proxy", NO_PROXY);
-            }
+        let proxy = proxy.or_else(|| std::env::var("WAKU_PROXY").ok());
+        let effective_proxy = if std::env::var("WAKU_NO_PROXY").is_ok() {
+            None
+        } else {
+            proxy.as_deref().map(str::trim).filter(|p| {
+                !p.is_empty()
+                    && !p.eq_ignore_ascii_case("direct")
+                    && !p.eq_ignore_ascii_case("none")
+                    && !p.eq_ignore_ascii_case("off")
+            })
+        };
+        if let Some(proxy) = effective_proxy {
+            let normalized = if proxy.contains("://") {
+                proxy.to_string()
+            } else {
+                format!("http://{proxy}")
+            };
+            command.env("HTTP_PROXY", &normalized);
+            command.env("http_proxy", &normalized);
+            command.env("HTTPS_PROXY", &normalized);
+            command.env("https_proxy", &normalized);
+            command.env("ALL_PROXY", &normalized);
+            command.env("all_proxy", &normalized);
+            command.env("GRPC_PROXY", &normalized);
+            command.env("grpc_proxy", &normalized);
+            command.env("PI_PROXY", &normalized);
+            command.env("pi_proxy", &normalized);
+            command.env("ANTHROPIC_PROXY", &normalized);
+            command.env("anthropic_proxy", &normalized);
+            command.env("OPENAI_PROXY", &normalized);
+            command.env("openai_proxy", &normalized);
+            const NO_PROXY: &str = "localhost,127.0.0.1,::1,127.0.0.0/8,.local";
+            command.env("NO_PROXY", NO_PROXY);
+            command.env("no_proxy", NO_PROXY);
+        } else {
+            command.env_remove("HTTP_PROXY");
+            command.env_remove("http_proxy");
+            command.env_remove("HTTPS_PROXY");
+            command.env_remove("https_proxy");
+            command.env_remove("ALL_PROXY");
+            command.env_remove("all_proxy");
+            command.env_remove("GRPC_PROXY");
+            command.env_remove("grpc_proxy");
+            command.env_remove("PI_PROXY");
+            command.env_remove("pi_proxy");
+            command.env_remove("ANTHROPIC_PROXY");
+            command.env_remove("anthropic_proxy");
+            command.env_remove("OPENAI_PROXY");
+            command.env_remove("openai_proxy");
         }
         let mut child = command
             .env(DAEMON_TOKEN_ENV, &token)

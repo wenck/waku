@@ -325,9 +325,9 @@ settings.render_math_description:
 settings.proxy:
   en: Network proxy
 settings.proxy_description:
-  en: "Route AI provider requests through an HTTP or SOCKS5 proxy (e.g. http://127.0.0.1:2080). Leave empty to auto-detect."
+  en: "Route AI provider requests through an HTTP or SOCKS5 proxy (e.g. http://127.0.0.1:2080). Leave empty for direct connection (no proxy)."
 settings.proxy_placeholder:
-  en: "e.g. http://127.0.0.1:2080 (auto-detect)"
+  en: "e.g. http://127.0.0.1:2080 (empty for direct)"
 settings.theme_system:
   en: System
 settings.theme_light:

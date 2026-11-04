@@ -53,12 +53,7 @@ pub fn command(program: impl AsRef<OsStr>) -> Command {
 
 static PROXY_CACHE: RwLock<Option<Option<String>>> = RwLock::new(None);
 
-fn is_local_port_listening(port: u16) -> bool {
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok()
-}
-
-/// Resolve the configured or detected proxy URL for child provider commands.
+/// Resolve the configured proxy URL for child provider commands.
 pub fn resolve_proxy() -> Option<String> {
     if let Ok(guard) = PROXY_CACHE.read() {
         if let Some(cached) = &*guard {
@@ -100,42 +95,13 @@ fn probe_proxy() -> Option<String> {
                 if trimmed.eq_ignore_ascii_case("direct")
                     || trimmed.eq_ignore_ascii_case("none")
                     || trimmed.eq_ignore_ascii_case("off")
+                    || trimmed.is_empty()
                 {
                     return None;
                 }
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_owned());
-                }
+                return Some(trimmed.to_owned());
             }
         }
-    }
-
-    // 3. Inherited or cached shell proxy environment variables
-    for name in [
-        "HTTPS_PROXY",
-        "https_proxy",
-        "HTTP_PROXY",
-        "http_proxy",
-        "ALL_PROXY",
-        "all_proxy",
-    ] {
-        if let Some(val) = cached_login_shell_variable(OsStr::new(name)) {
-            let s = val.to_string_lossy().trim().to_owned();
-            if !s.is_empty() {
-                return Some(s);
-            }
-        }
-        if let Ok(val) = std::env::var(name) {
-            let s = val.trim().to_owned();
-            if !s.is_empty() {
-                return Some(s);
-            }
-        }
-    }
-
-    // 4. Default fallback: detect active local proxy on port 2080
-    if is_local_port_listening(2080) {
-        return Some("http://127.0.0.1:2080".to_owned());
     }
 
     None
@@ -156,11 +122,30 @@ fn normalize_proxy(proxy: &str) -> String {
     }
 }
 
-/// Apply proxy environment variables to a child command.
+/// Apply proxy environment variables to a child command, or strip proxy variables if not configured.
 pub fn apply_proxy_environment(command: &mut Command) {
     if let Some(proxy) = resolve_proxy() {
         apply_proxy_to_command(command, &proxy);
+    } else {
+        remove_proxy_from_command(command);
     }
+}
+
+pub fn remove_proxy_from_command(command: &mut Command) {
+    command.env_remove("HTTP_PROXY");
+    command.env_remove("http_proxy");
+    command.env_remove("HTTPS_PROXY");
+    command.env_remove("https_proxy");
+    command.env_remove("ALL_PROXY");
+    command.env_remove("all_proxy");
+    command.env_remove("GRPC_PROXY");
+    command.env_remove("grpc_proxy");
+    command.env_remove("PI_PROXY");
+    command.env_remove("pi_proxy");
+    command.env_remove("ANTHROPIC_PROXY");
+    command.env_remove("anthropic_proxy");
+    command.env_remove("OPENAI_PROXY");
+    command.env_remove("openai_proxy");
 }
 
 pub fn apply_proxy_to_command(command: &mut Command, proxy: &str) {
@@ -1483,6 +1468,10 @@ mod tests {
 
     #[test]
     fn commands_receive_proxy_environment_variables() {
+        unsafe {
+            std::env::set_var("WAKU_PROXY", "http://127.0.0.1:9999");
+        }
+        invalidate_proxy_cache();
         let mut cmd = command("/usr/bin/env");
         let output = output(&mut cmd).expect("run env");
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1493,6 +1482,16 @@ mod tests {
         assert!(stdout.contains("ANTHROPIC_PROXY="));
         assert!(stdout.contains("OPENAI_PROXY="));
         assert!(stdout.contains("NO_PROXY="));
+
+        unsafe {
+            std::env::remove_var("WAKU_PROXY");
+        }
+        invalidate_proxy_cache();
+        let mut direct_cmd = command("/usr/bin/env");
+        let direct_output = output(&mut direct_cmd).expect("run env");
+        let direct_stdout = String::from_utf8_lossy(&direct_output.stdout);
+        assert!(!direct_stdout.contains("HTTP_PROXY="));
+        assert!(!direct_stdout.contains("PI_PROXY="));
     }
 
     #[test]

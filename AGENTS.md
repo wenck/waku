@@ -31,9 +31,10 @@
 5. **28px max font size & Cmd/Ctrl +/- zoom**: Font size clamps to 28px; Cmd/Ctrl + and - zoom UI.
 6. **Broader transcript line width**: `CONTENT_MAX_WIDTH = 1080.0`, `USER_MESSAGE_MAX_WIDTH = 920.0` in `src/app.rs` and `src/app/components.rs` to avoid premature text wrapping.
 7. **Proxy support & PI_PROXY injection**:
-   - Configurable in Settings (`General ➔ Network proxy`), auto-detects `http://127.0.0.1:2080`.
-   - Injects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `GRPC_PROXY`, and critically **`PI_PROXY`** (required by Oh My Pi / Bun fetch; otherwise Bun ignores HTTP_PROXY), `ANTHROPIC_PROXY`, `OPENAI_PROXY`.
-   - Process attribution: The Waku GUI process does not make AI requests directly; child daemon/agent CLI processes (`omp`, `18.11.0`, `agy`) connect to proxy port 2080.
+   - Configurable in Settings (`General ➔ Network proxy`). Leave empty for direct connection (no proxy).
+   - When configured, injects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `GRPC_PROXY`, and critically **`PI_PROXY`** (required by Oh My Pi / Bun fetch; otherwise Bun ignores HTTP_PROXY), `ANTHROPIC_PROXY`, `OPENAI_PROXY`.
+   - When empty or direct, explicitly removes proxy variables to guarantee direct connection without accidental fallback.
+   - Process attribution: The Waku GUI process does not make AI requests directly; child daemon/agent CLI processes (`omp`, `18.11.0`, `agy`) connect to configured proxy port.
    - Oh My Pi model probe (`crates/waku-core/src/model_catalog.rs`) must NOT pass `--no-extensions`, so plugin-based providers (like Antigravity) are discovered.
 8. **Screen capture protection (anti-surveillance)**:
    - `configure_capture_protection` in `src/platform.rs` and `src/lib.rs` sets `NSWindowSharingType::None` (`[window setSharingType:NSWindowSharingNone]`).

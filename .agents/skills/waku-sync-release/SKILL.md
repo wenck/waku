@@ -47,8 +47,9 @@ xcrun -f metal
 8. **Runtime shaders** (`Build GPUI shaders at runtime so Command Line Tools can compile`) — `gpui_macos` declared with `runtime_shaders` under `[target.'cfg(target_os = "macos")'.dependencies]` in `Cargo.toml`, plus its `Cargo.lock` entry. This is what lets the app build without Xcode. **Do not revert it and do not re-add it by hand** — see the machine constraint above.
 9. **Broader transcript line width** (`CONTENT_MAX_WIDTH = 1080.0`, `USER_MESSAGE_MAX_WIDTH = 920.0`) in `src/app.rs` and `src/app/components.rs`.
 10. **Proxy support & PI_PROXY / extension discovery**:
-    - Settings ➔ General ➔ Network proxy (`settings.proxy`), auto-detects `http://127.0.0.1:2080`.
-    - Injects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `GRPC_PROXY`, **`PI_PROXY`** (critical: Oh My Pi/Bun global fetch does not use HTTP_PROXY without PI_PROXY!), `ANTHROPIC_PROXY`, `OPENAI_PROXY`.
+    - Settings ➔ General ➔ Network proxy (`settings.proxy`). Leave empty for direct connection (no proxy).
+    - When configured, injects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `GRPC_PROXY`, **`PI_PROXY`** (critical: Oh My Pi/Bun global fetch does not use HTTP_PROXY without PI_PROXY!), `ANTHROPIC_PROXY`, `OPENAI_PROXY`.
+    - When empty or direct, explicitly removes proxy variables to guarantee direct connection without accidental fallback.
     - Oh My Pi model probe (`crates/waku-core/src/model_catalog.rs`) must NOT pass `--no-extensions`, ensuring extension-based providers (like `antigravity`) are discovered.
 11. **Screen capture protection** (`NSWindowSharingType::None` / `configure_capture_protection` in `src/platform.rs` and `src/lib.rs`): window contents are blanked out in screenshots and screen recordings to protect against enterprise surveillance monitoring. Can be disabled via `WAKU_ALLOW_SCREEN_CAPTURE=1`.
 
