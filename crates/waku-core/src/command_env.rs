@@ -68,6 +68,10 @@ pub fn resolve_proxy() -> Option<String> {
 }
 
 fn probe_proxy() -> Option<String> {
+    probe_proxy_at(&waku_protocol::DaemonSettings::default_path())
+}
+
+fn probe_proxy_at(settings_path: &Path) -> Option<String> {
     if std::env::var("WAKU_NO_PROXY").is_ok() {
         return None;
     }
@@ -87,7 +91,6 @@ fn probe_proxy() -> Option<String> {
     }
 
     // 2. Check settings.json via waku_protocol::DaemonSettings::default_path()
-    let settings_path = waku_protocol::DaemonSettings::default_path();
     if let Ok(contents) = fs::read_to_string(settings_path) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&contents) {
             if let Some(proxy) = value.get("proxy").and_then(|p| p.as_str()) {
@@ -985,6 +988,16 @@ mod tests {
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
+    /// Tests that read or write `WAKU_PROXY` / `WAKU_NO_PROXY` change state for
+    /// the whole process, so they must not overlap with each other.
+    static PROXY_ENVIRONMENT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_proxy_environment() -> std::sync::MutexGuard<'static, ()> {
+        PROXY_ENVIRONMENT_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     fn command_search_path(command: &Command) -> Vec<PathBuf> {
         let path = command
             .get_envs()
@@ -1468,13 +1481,15 @@ mod tests {
 
     #[test]
     fn commands_receive_proxy_environment_variables() {
+        let _guard = lock_proxy_environment();
         unsafe {
+            std::env::remove_var("WAKU_NO_PROXY");
             std::env::set_var("WAKU_PROXY", "http://127.0.0.1:9999");
         }
         invalidate_proxy_cache();
         let mut cmd = command("/usr/bin/env");
-        let output = output(&mut cmd).expect("run env");
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let proxied = output(&mut cmd).expect("run env");
+        let stdout = String::from_utf8_lossy(&proxied.stdout);
         assert!(stdout.contains("HTTP_PROXY="));
         assert!(stdout.contains("HTTPS_PROXY="));
         assert!(stdout.contains("ALL_PROXY="));
@@ -1483,8 +1498,10 @@ mod tests {
         assert!(stdout.contains("OPENAI_PROXY="));
         assert!(stdout.contains("NO_PROXY="));
 
+        // Direct mode: the client exports WAKU_NO_PROXY, and every proxy
+        // variable is stripped even while WAKU_PROXY is still set.
         unsafe {
-            std::env::remove_var("WAKU_PROXY");
+            std::env::set_var("WAKU_NO_PROXY", "1");
         }
         invalidate_proxy_cache();
         let mut direct_cmd = command("/usr/bin/env");
@@ -1492,6 +1509,48 @@ mod tests {
         let direct_stdout = String::from_utf8_lossy(&direct_output.stdout);
         assert!(!direct_stdout.contains("HTTP_PROXY="));
         assert!(!direct_stdout.contains("PI_PROXY="));
+
+        unsafe {
+            std::env::remove_var("WAKU_NO_PROXY");
+            std::env::remove_var("WAKU_PROXY");
+        }
+        invalidate_proxy_cache();
+    }
+
+    /// An empty proxy field means a direct connection: the settings file must
+    /// not silently fall back to a proxy running on a well-known local port.
+    #[test]
+    fn an_empty_proxy_setting_means_direct_connection() {
+        let _guard = lock_proxy_environment();
+        unsafe {
+            std::env::remove_var("WAKU_NO_PROXY");
+            std::env::remove_var("WAKU_PROXY");
+        }
+        let id = SHELL_ENV_CAPTURE_ID.fetch_add(1, Ordering::Relaxed);
+        let directory =
+            std::env::temp_dir().join(format!("waku-proxy-test-{}-{id}", std::process::id()));
+        fs::create_dir(&directory).expect("create proxy fixture directory");
+        let settings = directory.join("settings.json");
+
+        for direct in ["", "   ", "direct", "none", "off"] {
+            fs::write(&settings, format!("{{\"proxy\": \"{direct}\"}}")).expect("write settings");
+            assert_eq!(
+                probe_proxy_at(&settings),
+                None,
+                "{direct:?} must mean a direct connection"
+            );
+        }
+
+        fs::write(&settings, "{\"proxy\": \"127.0.0.1:2080\"}").expect("write settings");
+        assert_eq!(
+            probe_proxy_at(&settings),
+            Some("127.0.0.1:2080".to_string())
+        );
+
+        fs::write(&settings, "{}").expect("write settings");
+        assert_eq!(probe_proxy_at(&settings), None);
+
+        let _ = fs::remove_dir_all(directory);
     }
 
     #[test]
